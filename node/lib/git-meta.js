@@ -44,6 +44,8 @@ const checkout     = require("./cmd/checkout");
 const cherryPick   = require("./cmd/cherry_pick");
 const close        = require("./cmd/close");
 const commit       = require("./cmd/commit");
+const diffIndex    = require("./cmd/diff_index");
+const diffFiles    = require("./cmd/diff_files");
 const Forward      = require("./cmd/forward");
 const include      = require("./cmd/include");
 const listFiles    = require("./cmd/list_files");
@@ -128,6 +130,8 @@ const commands = {
     "cherry-pick": cherryPick,
     "close": close,
     "commit": commit,
+    "diff-index": diffIndex,
+    "diff-files": diffFiles,
     "include": include,
     "ls-files": listFiles,
     "merge": merge,

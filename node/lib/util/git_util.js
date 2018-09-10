@@ -1066,3 +1066,25 @@ git -C '${repo.path()}' merge-base ${id1} ${id2}`;
     }
     return result.stdout.split("\n").filter(x => x);
 });
+
+exports.runGitCommand = co.wrap(function *(name, args, path) {
+    const ChildProcess = require("child-process-promise");
+
+    const gitPath = path !== undefined ? path : exports.getRootGitDirectory();
+
+    const gitArgs = [
+        "-C",
+        gitPath,
+        name,
+    ].concat(args);
+    try {
+        return ChildProcess.spawn("git", gitArgs, {
+            capture: ["stdout"],
+        }).then(result => {
+            return result.stdout.toString();
+        });
+    }
+    catch (e) {
+        process.exit(e.code);
+    }
+});
