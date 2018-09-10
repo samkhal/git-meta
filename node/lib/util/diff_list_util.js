@@ -99,3 +99,31 @@ exports.FileDiffManager = class {
     }
 };
 
+exports.PatchManager = class {
+    parse(str, excludePaths){
+        return str;
+    }
+
+    convertToMeta(str, subrepoPath){
+        return str;
+    }
+
+    combineToString(strList){
+        return strList.filter(str => str.length > 0).join("\n");
+    }
+}
+
+exports.StatManager = class {
+    parse(str, excludePaths){
+        return str;
+    }
+
+    convertToMeta(str, subrepoPath){
+        return str;
+    }
+
+    combineToString(strList){
+        return strList.filter(str => str.length > 0).join("\n");
+    }
+}
+

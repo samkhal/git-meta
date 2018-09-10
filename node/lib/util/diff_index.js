@@ -80,18 +80,33 @@ exports.diffIndex = co.wrap(function *(repo, args) {
     const subNames = new Set(yield SubmoduleUtil.getSubmoduleNames(repo));
     const openSubs = yield SubmoduleUtil.listOpenSubmodules(repo);
 
-    const distributeCommand = co.wrap(function *(command, args, manager){
-        const metaOutputStr = yield GitUtil.runGitCommand(command, args);
+    const metaExcludePaths = subNames;
+    metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
+
+    function pathArgs(paths){
+        return ["--"].concat(paths);
+    }
+
+    // paths is an optional map of submodues->path list. The meta repo is represented by "."
+    const distributeCommand = co.wrap(function *(command, args, manager, paths){
+        let metaPathArgs = [];
+        if(paths !== undefined && paths["."] !== undefined){
+            metaPathArgs = ["--"].concat(paths["."]);
+        }
+        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs));
         const repoOutputs = [];
 
-        const excludes = subNames.add(SubmoduleConfigUtil.modulesFileName);
-
-        repoOutputs.push(manager.parse(metaOutputStr, excludes));
+        repoOutputs.push(manager.parse(metaOutputStr, metaExcludePaths));
 
         yield openSubs.map(co.wrap(function *(subRepoName) {
             const subRepo = yield SubmoduleUtil.getRepo(repo, subRepoName);
             const subRepoPath = subRepo.path();
-            const subOutputStr = yield GitUtil.runGitCommand(command, args, subRepoPath);
+
+            let subPathArgs = [];
+            if(paths !== undefined && paths[subRepoName] !== undefined){
+                subPathArgs = ["--"].concat(paths[subRepoName]);
+            }
+            const subOutputStr = yield GitUtil.runGitCommand(command, args.concat(subPathArgs), subRepoPath);
             const subOutput = manager.convertToMeta(manager.parse(subOutputStr), subRepoName);
             repoOutputs.push(subOutput);
         }));
@@ -99,66 +114,47 @@ exports.diffIndex = co.wrap(function *(repo, args) {
         return manager.combineToString(repoOutputs);
     });
 
+    // console.log(args.paths);
+    let subPaths;
+    if(args.paths.length > 0){
+        const indexSubNames = yield SubmoduleUtil.getSubmoduleNames(
+            repo);
+        const openSubmodules = yield SubmoduleUtil.listOpenSubmodules(
+            repo);
+        subPaths = SubmoduleUtil.resolvePaths(args.paths, indexSubNames, openSubmodules);
+    }
+    // console.log(subPaths);
+
     const handleRaw = co.wrap(function *(){
         const commandArgs = args.forwardArgs.concat(['-z', '--raw', args.commit]);
-        return distributeCommand("diff-index", commandArgs, new DiffListUtil.FileDiffManager(args.z));
-        return "";
-        // DiffListUtil
-        // const commandArgs = args.forwardArgs.concat(['-z', '--raw', args.commit]);
-
-        // // First look at all the files in the meta-repo, ignoring submodules
-        // // `.gitmodules` file.
-
-        // const fileDiffs = DiffListUtil.FileDiff.parseList(yield GitUtil.runGitCommand("diff-index", commandArgs)).filter(fileDiff =>
-        // {
-        //     let name = fileDiff.paths[0];
-        //     return !subNames.has(name) // Skip submodules
-        //         && SubmoduleConfigUtil.modulesFileName !== name; //exclude .gitmodules 
-        // });
-
-        // // Then get diffs in submodules.
-
-        // yield openSubs.map(co.wrap(function *(name) {
-
-        //     const subRepo = yield SubmoduleUtil.getRepo(repo, name);
-        //     const subRepoDiffs = DiffListUtil.FileDiff.parseList(yield GitUtil.runGitCommand("diff-index", commandArgs, subRepo.path()));
-        //     subRepoDiffs.map(diff => diff.addPathParent(name));
-        //     fileDiffs.push.apply(fileDiffs, subRepoDiffs);
-        // }));
-        // return DiffListUtil.FileDiff.listToString(fileDiffs, args.z);
+        return distributeCommand("diff-index", commandArgs, new DiffListUtil.FileDiffManager(args.z), subPaths);
     })
 
 
     const handlePatch = co.wrap(function *(){
-        const commandArgs = args.forwardArgs.concat(['--patch']);
-
-        // get obj list for metarepo
-        // filter out submodules/.gitmodules
-        // for each subrepo, get obj list
-        //      fix paths
-        // join the pieces
-        return "";
-
+        const commandArgs = args.forwardArgs.concat(['--patch', args.commit]);
+        return distributeCommand("diff-index", commandArgs, new DiffListUtil.PatchManager(), subPaths);
     })
 
     const handleStat = co.wrap(function *(){
-        return "";
-
+        const commandArgs = args.forwardArgs.concat(['--stat', args.commit]);
+        return distributeCommand("diff-index", commandArgs, new DiffListUtil.StatManager(), subPaths);
     })
 
     let output_patch = args.patch || args.patch_with_stat || args.patch_with_raw;
     let output_stat = args.stat || args.patch_with_stat;
     let output_raw = args.raw || (!output_patch && !output_stat); // output raw if patch and stat are not selected
 
+
     let output = ""
     if(output_raw){
         output += yield handleRaw();
     }
     if(output_stat){
-        output += handleStat();
+        output += yield handleStat();
     }
     if(output_patch){
-        output += handlePatch();
+        output += yield handlePatch();
     }
     return output;
 });

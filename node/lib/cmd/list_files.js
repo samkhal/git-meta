@@ -51,7 +51,10 @@ directory cache index of the meta-repository and or open submodules.  The
 default behavior is to list all files from the current working director down,
 inluding (relevant) files in the meta-repository and opened submodules.`;
 
-exports.configureParser = function (/* parser */) {
+exports.configureParser = function (parser) {
+    parser.addArgument(['-z'], {action: "storeTrue"});
+    // parser.addArgument(['--others'], {action: "storeTrue"});
+    // parser.addArgument(['--exclude-standard'], {action: "storeTrue"});
 };
 
 /**

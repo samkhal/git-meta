@@ -107,6 +107,10 @@ exports.configureParser = function (parser) {
         type: "string",
         help: "id of tree object to diff against",
     });
+
+    parser.addArgument("paths", {
+        nargs: "*"
+    })
 };
 
 /**
