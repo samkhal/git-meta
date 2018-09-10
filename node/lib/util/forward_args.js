@@ -30,63 +30,28 @@
  */
 "use strict";
 
-const co = require("co");
+const argparse = require("argparse");
 
-/**
- * This module contains methods for implementing the `diff-files` command.
- */
+exports.ForwardArgsAction = function(options){
+    argparse.Action.call(this, options);
+}
+exports.ForwardArgsAction.prototype = Object.create(argparse.Action.prototype);
+exports.ForwardArgsAction.prototype.constructor = exports.ForwardArgsAction;
+exports.ForwardArgsAction.prototype.call = function(parser, namespace, values, optionString){
+    if(namespace.forwardArgs === undefined){
+        namespace.forwardArgs = [];
+    }
+    namespace.forwardArgs.push(optionString);
+    if(values !== null && values.length != 0){  //bug here, values might not be a list
+        namespace.forwardArgs.push(values);
+    }
+}
 
-/**
- * help text for the `diff-files` command
- * @property {String}
- */
-exports.helpText = `Compares files int the working tree and the index in the meta-repo and open submodules.`;
-
-/**
- * description of the `diff-index` command
- * @property {String}
- */
-exports.description =`TODO`;
-
-exports.configureParser = function (parser) {
-    const forwardArgs = require("../util/forward_args").forwardArgs;
-
-    parser.addArgument('-z', {
-        action: "storeTrue",
+exports.forwardArgs = function(parser, argsToForward){
+    argsToForward.map(arg => {
+        parser.addArgument(arg.name, {
+            nargs: arg.nargs,
+            action: exports.ForwardArgsAction
+        });
     });
-
-    forwardArgs(parser, [
-        {name: "--diff-filter", nargs: "?"},
-        {name: "--cached", nargs: 0},
-        {name: "--encoding", nargs: "?"},
-        {name: "--root", nargs: 0},
-        {name: ["-M", "--find-renames"], nargs: "?"},
-    ]);
-
-    parser.addArgument('-C', {
-        nargs: "?",
-        help: "Ignored",
-    })
-
-    parser.addArgument("paths", {
-        nargs: "*"
-    })
-};
-
-/**
- * Execute the `diff-files` command according to the specified `args`.
- *
- * @async
- * @param {Object} args
- */
-exports.executeableSubcommand = co.wrap(function *(args) {
-    console.log("starting");
-
-    const DiffFiles = require("../util/diff_files");
-    const GitUtil = require("../util/git_util");
-
-    const repo = yield GitUtil.getCurrentRepo();
-
-    const fileDiff = yield DiffFiles.diffFiles(repo, args);
-    process.stdout.write(fileDiff);
-});
+}

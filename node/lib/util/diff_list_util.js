@@ -41,6 +41,44 @@
  */
 
 const Path = require("path");
+const co   = require("co");
+
+const GitUtil  = require("../util/git_util");
+const SubmoduleUtil       = require("./submodule_util");
+
+// paths is an optional map of submodues->path list. The meta repo is represented by "."
+exports.distributeCommand = co.wrap(function *(command, args, manager, paths, repoInfo){
+    const runAllPaths = paths === undefined;
+    const repoOutputs = []
+
+
+    let metaPathArgs = [];
+    if(paths && paths['.'] && paths['.'].length > 0){
+        metaPathArgs = ["--"].concat(paths["."]);
+    }
+    if(runAllPaths || metaPathArgs.length > 0){
+        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs));
+        repoOutputs.push(manager.parse(metaOutputStr, repoInfo.metaExcludePaths));
+    }
+
+    yield repoInfo.openSubs.map(co.wrap(function *(subRepoName) {
+        const subRepo = yield SubmoduleUtil.getRepo(repoInfo.repo, subRepoName);
+        const subRepoPath = subRepo.path();
+
+        let subPathArgs = [];
+        if(paths && paths[subRepoName] && paths[subRepoName].length > 0){
+            subPathArgs = ["--"].concat(paths[subRepoName]);
+        }
+        if(runAllPaths || subPathArgs.length > 0){
+
+            const subOutputStr = yield GitUtil.runGitCommand(command, args.concat(subPathArgs), subRepoPath);
+            const subOutput = manager.convertToMeta(manager.parse(subOutputStr), subRepoName);
+            repoOutputs.push(subOutput);
+        }
+    }));
+
+    return manager.combineToString(repoOutputs);
+});
 
 exports.FileDiff = class {
     constructor(metadata, paths){

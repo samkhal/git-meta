@@ -49,48 +49,19 @@ exports.helpText = `Compare a tree to the working tree or index in the meta-repo
 exports.description =`TODO`;
 
 exports.configureParser = function (parser) {
-    const argparse = require("argparse");
-    // parser.addArgument(['-z'], {
-    //     action: "storeConst",
-    //     constant: true,
-    //     help: "abort an in-progress rebase",
-    // });;
+    const forwardArgs = require("../util/forward_args").forwardArgs;
+
     parser.addArgument('-z', {
         action: "storeTrue",
     });
 
-    const argsToForward = [
+    forwardArgs(parser, [
         {name: "--diff-filter", nargs: "?"},
         {name: "--cached", nargs: 0},
         {name: "--encoding", nargs: "?"},
         {name: "--root", nargs: 0},
         {name: ["-M", "--find-renames"], nargs: "?"},
-    ];
-
-    function ForwardArgsAction(options){
-        argparse.Action.call(this, options);
-    }
-    ForwardArgsAction.prototype = Object.create(argparse.Action.prototype);
-    ForwardArgsAction.prototype.constructor = ForwardArgsAction;
-    ForwardArgsAction.prototype.call = function(parser, namespace, values, optionString){
-        // console.log("Namespace ",namespace);
-        // console.log("Values ", values);
-        // console.log("Options ", optionString);
-        if(namespace.forwardArgs === undefined){
-            namespace.forwardArgs = [];
-        }
-        namespace.forwardArgs.push(optionString);
-        if(values !== null && values.length != 0){  //bug here, values might not be a list
-            namespace.forwardArgs.push(values);
-        }
-    }
-
-    argsToForward.map(arg => {
-        parser.addArgument(arg.name, {
-            nargs: arg.nargs,
-            action: ForwardArgsAction
-        });
-    })
+    ]);
 
     parser.addArgument('-C', {
         nargs: "?",
@@ -118,18 +89,15 @@ exports.configureParser = function (parser) {
  *
  * @async
  * @param {Object} args
- * @param {String} args.commit
  */
 exports.executeableSubcommand = co.wrap(function *(args) {
-    const fs   = require("fs-promise");
-    const path = require("path");
 
     const DiffIndex = require("../util/diff_index");
     const GitUtil = require("../util/git_util");
 
     const repo = yield GitUtil.getCurrentRepo();
 
-    // const args = ['-z','--diff-filter=ACDMRTXB','--cached','HEAD','--'];
     const indexDiff = yield DiffIndex.diffIndex(repo, args);
-    console.log(indexDiff);
+
+    process.stdout.write(indexDiff);
 });

@@ -83,38 +83,6 @@ exports.diffIndex = co.wrap(function *(repo, args) {
     const metaExcludePaths = subNames;
     metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
 
-    function pathArgs(paths){
-        return ["--"].concat(paths);
-    }
-
-    // paths is an optional map of submodues->path list. The meta repo is represented by "."
-    const distributeCommand = co.wrap(function *(command, args, manager, paths){
-        let metaPathArgs = [];
-        if(paths !== undefined && paths["."] !== undefined){
-            metaPathArgs = ["--"].concat(paths["."]);
-        }
-        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs));
-        const repoOutputs = [];
-
-        repoOutputs.push(manager.parse(metaOutputStr, metaExcludePaths));
-
-        yield openSubs.map(co.wrap(function *(subRepoName) {
-            const subRepo = yield SubmoduleUtil.getRepo(repo, subRepoName);
-            const subRepoPath = subRepo.path();
-
-            let subPathArgs = [];
-            if(paths !== undefined && paths[subRepoName] !== undefined){
-                subPathArgs = ["--"].concat(paths[subRepoName]);
-            }
-            const subOutputStr = yield GitUtil.runGitCommand(command, args.concat(subPathArgs), subRepoPath);
-            const subOutput = manager.convertToMeta(manager.parse(subOutputStr), subRepoName);
-            repoOutputs.push(subOutput);
-        }));
-
-        return manager.combineToString(repoOutputs);
-    });
-
-    // console.log(args.paths);
     let subPaths;
     if(args.paths.length > 0){
         const indexSubNames = yield SubmoduleUtil.getSubmoduleNames(
@@ -123,22 +91,31 @@ exports.diffIndex = co.wrap(function *(repo, args) {
             repo);
         subPaths = SubmoduleUtil.resolvePaths(args.paths, indexSubNames, openSubmodules);
     }
-    // console.log(subPaths);
+
+    const repoInfo = {
+        "repo": repo,
+        "openSubs": openSubs,
+        "metaExcludePaths": metaExcludePaths
+    };
+
+    if(args.forwardArgs === undefined){
+        args.forwardArgs = [];
+    }
 
     const handleRaw = co.wrap(function *(){
         const commandArgs = args.forwardArgs.concat(['-z', '--raw', args.commit]);
-        return distributeCommand("diff-index", commandArgs, new DiffListUtil.FileDiffManager(args.z), subPaths);
+        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.FileDiffManager(args.z), subPaths, repoInfo);
     })
 
 
     const handlePatch = co.wrap(function *(){
         const commandArgs = args.forwardArgs.concat(['--patch', args.commit]);
-        return distributeCommand("diff-index", commandArgs, new DiffListUtil.PatchManager(), subPaths);
+        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.PatchManager(), subPaths, openSubs, repoInfo);
     })
 
     const handleStat = co.wrap(function *(){
         const commandArgs = args.forwardArgs.concat(['--stat', args.commit]);
-        return distributeCommand("diff-index", commandArgs, new DiffListUtil.StatManager(), subPaths);
+        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.StatManager(), subPaths, openSubs, repoInfo);
     })
 
     let output_patch = args.patch || args.patch_with_stat || args.patch_with_raw;

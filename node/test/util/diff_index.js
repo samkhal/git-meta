@@ -30,63 +30,44 @@
  */
 "use strict";
 
-const co = require("co");
+const assert = require("chai").assert;
+const co     = require("co");
 
-/**
- * This module contains methods for implementing the `diff-files` command.
- */
+const DiffFiles = require("../../lib/util/diff_files");
+const RepoASTTestUtil = require("../../lib/util/repo_ast_test_util");
 
-/**
- * help text for the `diff-files` command
- * @property {String}
- */
-exports.helpText = `Compares files int the working tree and the index in the meta-repo and open submodules.`;
+describe("DiffIndex", function () {
+    // Will always read "x".
 
-/**
- * description of the `diff-index` command
- * @property {String}
- */
-exports.description =`TODO`;
-
-exports.configureParser = function (parser) {
-    const forwardArgs = require("../util/forward_args").forwardArgs;
-
-    parser.addArgument('-z', {
-        action: "storeTrue",
+    const cases = {
+        "empty": {
+            state: "x=S:I README.md",
+            args: ["HEAD"],
+            expected: ["D\tREADME.md"],
+        },
+        // "file in meta": {
+        //     state: "x=S",
+        //     expected: ["README.md"],
+        // },
+    };
+    Object.keys(cases).forEach(caseName => {
+        console.log("asdfasdf");
+        const c = cases[caseName];
+        it(caseName, co.wrap(function *() {
+            console.log("bbbb");
+            console.log(c.args);
+            const written = yield RepoASTTestUtil.createMultiRepos(c.state);
+            const repo = written.repos.x;
+            const result = yield DiffFiles.diffFiles(repo, c.args);
+            const resultLines = result.split('\n');
+            process.stdout.write(result, c.args);
+            process.stdout.write("asdfasdf");
+            console.log("asdfasdf");
+            assert.equal(resultLines.length, expected.length);
+            let i;
+            for (i=0; i<resultLines.length; i++){
+                assert.include(expected[i], resultLines[i]);
+            }
+        }));
     });
-
-    forwardArgs(parser, [
-        {name: "--diff-filter", nargs: "?"},
-        {name: "--cached", nargs: 0},
-        {name: "--encoding", nargs: "?"},
-        {name: "--root", nargs: 0},
-        {name: ["-M", "--find-renames"], nargs: "?"},
-    ]);
-
-    parser.addArgument('-C', {
-        nargs: "?",
-        help: "Ignored",
-    })
-
-    parser.addArgument("paths", {
-        nargs: "*"
-    })
-};
-
-/**
- * Execute the `diff-files` command according to the specified `args`.
- *
- * @async
- * @param {Object} args
- */
-exports.executeableSubcommand = co.wrap(function *(args) {
-    console.log("starting");
-
-    const DiffFiles = require("../util/diff_files");
-    const GitUtil = require("../util/git_util");
-
-    const repo = yield GitUtil.getCurrentRepo();
-
-    const fileDiff = yield DiffFiles.diffFiles(repo, args);
-    process.stdout.write(fileDiff);
 });

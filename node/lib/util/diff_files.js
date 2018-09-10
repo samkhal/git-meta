@@ -37,7 +37,7 @@ const NodeGit = require("nodegit");
 const SubmoduleConfigUtil = require("./submodule_config_util");
 const SubmoduleUtil       = require("./submodule_util");
 const GitUtil             = require("../util/git_util");
-const FileDiff            = require("../util/diff_list_util").FileDiff;
+const DiffListUtil         = require("../util/diff_list_util");
 
 /**
  * Outputs the result of diff-files in the specified repo and open submodules,
@@ -54,29 +54,29 @@ exports.diffFiles = co.wrap(function *(repo, args) {
     const subNames = new Set(yield SubmoduleUtil.getSubmoduleNames(repo));
     const openSubs = yield SubmoduleUtil.listOpenSubmodules(repo);
 
-    const commandArgs = ['-z'];
+    const metaExcludePaths = subNames;
+    metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
 
-    // First look at all the files in the meta-repo, ignoring submodules
-    // `.gitmodules` file.
+    let subPaths;
+    if(args.paths.length > 0){
+        const indexSubNames = yield SubmoduleUtil.getSubmoduleNames(
+            repo);
+        const openSubmodules = yield SubmoduleUtil.listOpenSubmodules(
+            repo);
+        subPaths = SubmoduleUtil.resolvePaths(args.paths, indexSubNames, openSubmodules);
+    }
 
-    const fileDiffs = FileDiff.parseList(yield GitUtil.runGitCommand("diff-files", commandArgs)).filter(fileDiff => 
-    {
-        let name = fileDiff.paths[0];
-        return !subNames.has(name) // Skip submodules
-            && SubmoduleConfigUtil.modulesFileName !== name; //exclude .gitmodules 
-    });
+    if(args.forwardArgs === undefined){
+        args.forwardArgs = [];
+    }
 
-    // Then get diffs in submodules.
+    const repoInfo = {
+        "repo": repo,
+        "openSubs": openSubs,
+        "metaExcludePaths": metaExcludePaths
+    };
 
-    yield openSubs.map(co.wrap(function *(name) {
+    const commandArgs = args.forwardArgs.concat(['-z']);
 
-        const subRepo = yield SubmoduleUtil.getRepo(repo, name);
-        const subRepoDiffs = FileDiff.parseList(yield GitUtil.runGitCommand("diff-files", commandArgs, subRepo.path()));
-        subRepoDiffs.map(diff => diff.addPathParent(name));
-        fileDiffs.push.apply(fileDiffs, subRepoDiffs);
-    }));
-    // console.log(JSON.stringify(fileDiffs));
-    return FileDiff.listToString(fileDiffs, args.z);
-    // return metarepoDiffs + subrepoDiffs;
-
+    return DiffListUtil.distributeCommand("diff-files", commandArgs, new DiffListUtil.FileDiffManager(args.z), subPaths, repoInfo);
 });
