@@ -33,7 +33,9 @@
 const assert = require("chai").assert;
 const co     = require("co");
 
-const DiffFiles = require("../../lib/util/diff_files");
+const ArgumentParser = require("argparse").ArgumentParser;
+const DiffIndex = require("../../lib/util/diff_index");
+const DiffIndexCmd = require("../../lib/cmd/diff_index");
 const RepoASTTestUtil = require("../../lib/util/repo_ast_test_util");
 
 describe("DiffIndex", function () {
@@ -45,28 +47,25 @@ describe("DiffIndex", function () {
             args: ["HEAD"],
             expected: ["D\tREADME.md"],
         },
-        // "file in meta": {
-        //     state: "x=S",
-        //     expected: ["README.md"],
-        // },
     };
     Object.keys(cases).forEach(caseName => {
-        console.log("asdfasdf");
         const c = cases[caseName];
         it(caseName, co.wrap(function *() {
-            console.log("bbbb");
-            console.log(c.args);
+
             const written = yield RepoASTTestUtil.createMultiRepos(c.state);
             const repo = written.repos.x;
-            const result = yield DiffFiles.diffFiles(repo, c.args);
+
+            const parser = new ArgumentParser()
+            DiffIndexCmd.configureParser(parser);
+            const parsedArgs = parser.parseArgs(c.args)
+
+            const result = yield DiffIndex.diffIndex(repo, parsedArgs);
             const resultLines = result.split('\n');
-            process.stdout.write(result, c.args);
-            process.stdout.write("asdfasdf");
-            console.log("asdfasdf");
-            assert.equal(resultLines.length, expected.length);
+
+            assert.equal(resultLines.length, c.expected.length);
             let i;
-            for (i=0; i<resultLines.length; i++){
-                assert.include(expected[i], resultLines[i]);
+            for (i = 0; i < resultLines.length; i++) {
+                assert.include(resultLines[i], c.expected[i]);
             }
         }));
     });

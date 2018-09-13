@@ -57,7 +57,7 @@ exports.distributeCommand = co.wrap(function *(command, args, manager, paths, re
         metaPathArgs = ["--"].concat(paths["."]);
     }
     if(runAllPaths || metaPathArgs.length > 0){
-        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs));
+        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs), repoInfo.repo.workdir());
         repoOutputs.push(manager.parse(metaOutputStr, repoInfo.metaExcludePaths));
     }
 
