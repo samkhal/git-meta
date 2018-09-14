@@ -35,8 +35,6 @@
  * significant functionality is deferred to the sub-commands.
  */
 
-require('v8-compile-cache');
-
 const ArgumentParser = require("argparse").ArgumentParser;
 const NodeGit = require("nodegit");
 

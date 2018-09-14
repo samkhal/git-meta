@@ -42,7 +42,12 @@ describe("DiffIndex", function () {
     // Will always read "x".
 
     const cases = {
-        "empty": {
+        "no_change": {
+            state: "x=S",
+            args: ["HEAD"],
+            expected: [],
+        },
+        "deleted": {
             state: "x=S:I README.md",
             args: ["HEAD"],
             expected: ["D\tREADME.md"],
@@ -60,9 +65,9 @@ describe("DiffIndex", function () {
             const parsedArgs = parser.parseArgs(c.args)
 
             const result = yield DiffIndex.diffIndex(repo, parsedArgs);
-            const resultLines = result.split('\n');
+            const resultLines = result.split('\n').filter(val => val !== '');
 
-            assert.equal(resultLines.length, c.expected.length);
+            assert.equal(resultLines.length, c.expected.length, "Result: ".concat(JSON.stringify(result)));
             let i;
             for (i = 0; i < resultLines.length; i++) {
                 assert.include(resultLines[i], c.expected[i]);

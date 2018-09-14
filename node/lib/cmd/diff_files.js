@@ -80,7 +80,6 @@ exports.configureParser = function (parser) {
  * @param {Object} args
  */
 exports.executeableSubcommand = co.wrap(function *(args) {
-    console.log("starting");
 
     const DiffFiles = require("../util/diff_files");
     const GitUtil = require("../util/git_util");
