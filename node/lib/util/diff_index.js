@@ -30,14 +30,14 @@
  */
 "use strict";
 
-const assert  = require("chai").assert;
-const co      = require("co");
+const assert = require("chai").assert;
+const co = require("co");
 const NodeGit = require("nodegit");
 
 const SubmoduleConfigUtil = require("./submodule_config_util");
-const SubmoduleUtil       = require("./submodule_util");
-const GitUtil             = require("../util/git_util");
-const DiffListUtil        = require("../util/diff_list_util");
+const SubmoduleUtil = require("./submodule_util");
+const GitUtil = require("../util/git_util");
+const DiffListUtil = require("../util/diff_list_util");
 
 /**
  * Outputs the result of diff-index in the specified repo and open submodules,
@@ -48,7 +48,7 @@ const DiffListUtil        = require("../util/diff_list_util");
  * @param {NodeGit.Repository} repo
  * @return {String}
  */
-exports.diffIndex = co.wrap(function *(repo, args) {
+exports.diffIndex = co.wrap(function* (repo, args) {
     assert.instanceOf(repo, NodeGit.Repository);
 
     // const ChildProcess = require('child_process');
@@ -84,7 +84,7 @@ exports.diffIndex = co.wrap(function *(repo, args) {
     metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
 
     let subPaths;
-    if(args.paths.length > 0){
+    if (args.paths.length > 0) {
         const indexSubNames = yield SubmoduleUtil.getSubmoduleNames(
             repo);
         const openSubmodules = yield SubmoduleUtil.listOpenSubmodules(
@@ -98,24 +98,24 @@ exports.diffIndex = co.wrap(function *(repo, args) {
         "metaExcludePaths": metaExcludePaths
     };
 
-    if(args.forwardArgs === undefined){
+    if (args.forwardArgs === undefined) {
         args.forwardArgs = [];
     }
 
-    const handleRaw = co.wrap(function *(){
+    const handleRaw = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['-z', '--raw', args.commit]);
-        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.FileDiffManager(args.z), subPaths, repoInfo);
+        return yield (new DiffListUtil.FileDiffManager("diff-index", commandArgs, repo, args.z)).run();
     })
 
 
-    const handlePatch = co.wrap(function *(){
+    const handlePatch = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['--patch', args.commit]);
-        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.PatchManager(), subPaths, openSubs, repoInfo);
+        return yield (new DiffListUtil.PatchManager("diff-index", commandArgs, repo)).run();
     })
 
-    const handleStat = co.wrap(function *(){
+    const handleStat = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['--stat', args.commit]);
-        return DiffListUtil.distributeCommand("diff-index", commandArgs, new DiffListUtil.StatManager(), subPaths, openSubs, repoInfo);
+        return yield (new DiffListUtil.StatManager("diff-index", commandArgs, repo)).run();
     })
 
     let output_patch = args.patch || args.patch_with_stat || args.patch_with_raw;
@@ -124,13 +124,13 @@ exports.diffIndex = co.wrap(function *(repo, args) {
 
 
     let output = ""
-    if(output_raw){
+    if (output_raw) {
         output += yield handleRaw();
     }
-    if(output_stat){
+    if (output_stat) {
         output += yield handleStat();
     }
-    if(output_patch){
+    if (output_patch) {
         output += yield handlePatch();
     }
     return output;

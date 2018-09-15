@@ -41,126 +41,161 @@
  */
 
 const Path = require("path");
-const co   = require("co");
+const co = require("co");
 
-const GitUtil  = require("../util/git_util");
-const SubmoduleUtil       = require("./submodule_util");
+const GitUtil = require("../util/git_util");
+const SubmoduleUtil = require("./submodule_util");
+const SubmoduleConfigUtil = require("./submodule_config_util");
 
-// paths is an optional map of submodues->path list. The meta repo is represented by "."
-exports.distributeCommand = co.wrap(function *(command, args, manager, paths, repoInfo){
-    const runAllPaths = paths === undefined;
-    const repoOutputs = []
-
-
-    let metaPathArgs = [];
-    if(paths && paths['.'] && paths['.'].length > 0){
-        metaPathArgs = ["--"].concat(paths["."]);
-    }
-    if(runAllPaths || metaPathArgs.length > 0){
-        const metaOutputStr = yield GitUtil.runGitCommand(command, args.concat(metaPathArgs), repoInfo.repo.workdir());
-        repoOutputs.push(manager.parse(metaOutputStr, repoInfo.metaExcludePaths));
+exports.CommandCombiner = class {
+    constructor(command, args, repo) {
+        this.command = command;
+        this.args = args;
+        this.repo = repo;
     }
 
-    yield repoInfo.openSubs.map(co.wrap(function *(subRepoName) {
-        const subRepo = yield SubmoduleUtil.getRepo(repoInfo.repo, subRepoName);
+    /**
+     * @param {Array} list file paths relative to metarepo root
+     */
+    async run(paths) {
+        if (paths === undefined) {
+            paths = []
+        }
+
+        const subNames = new Set(await SubmoduleUtil.getSubmoduleNames(this.repo));
+        const openSubs = await SubmoduleUtil.listOpenSubmodules(this.repo);
+
+        const metaExcludePaths = subNames;
+        metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
+
+        let pathMap = {};
+        if (paths.length > 0) {
+            const indexSubNames = await SubmoduleUtil.getSubmoduleNames(
+                repo);
+            const openSubmodules = await SubmoduleUtil.listOpenSubmodules(
+                repo);
+            pathMap = SubmoduleUtil.resolvePaths(paths, indexSubNames, openSubmodules);
+        }
+
+        const results = [];
+        const metaRepoPaths = "." in pathMap ? pathMap["."] : [];
+        results.push(await this.runForMetarepo(this.repo, metaRepoPaths, metaExcludePaths));
+
+        const self = this;
+        await Promise.all(openSubs.map(async function (subName) {
+            const subRepoPaths = subName in pathMap ? pathMap[subName] : [];
+            results.push(await self.runForSubrepo(subName, subRepoPaths));
+        }));
+
+        return this.combineToString(results);
+    }
+
+    async runForMetarepo(repo, paths, excludePaths) {
+        let metaPathArgs = [];
+        if (paths.length > 0) {
+            metaPathArgs = ["--"].concat(paths);
+        }
+
+        const metaOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(metaPathArgs), this.repo.workdir());
+        return this.parse(metaOutputStr, excludePaths);
+    }
+
+    async runForSubrepo(subRepoName, paths) {
+        const subRepo = await SubmoduleUtil.getRepo(this.repo, subRepoName);
         const subRepoPath = subRepo.path();
 
         let subPathArgs = [];
-        if(paths && paths[subRepoName] && paths[subRepoName].length > 0){
-            subPathArgs = ["--"].concat(paths[subRepoName]);
+        if (paths.length > 0) {
+            subPathArgs = ["--"].concat(paths);
         }
-        if(runAllPaths || subPathArgs.length > 0){
 
-            const subOutputStr = yield GitUtil.runGitCommand(command, args.concat(subPathArgs), subRepoPath);
-            const subOutput = manager.convertToMeta(manager.parse(subOutputStr), subRepoName);
-            repoOutputs.push(subOutput);
-        }
-    }));
-
-    return manager.combineToString(repoOutputs);
-});
+        const subOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(subPathArgs), subRepoPath);
+        return this.convertToMeta(this.parse(subOutputStr), subRepoName);
+    }
+}
 
 exports.FileDiff = class {
-    constructor(metadata, paths){
+    constructor(metadata, paths) {
         this.metadata = metadata;
         this.paths = paths;
     }
 
-    addPathParent(pathToRoot){
+    addPathParent(pathToRoot) {
         this.paths = this.paths.map(path => Path.join(pathToRoot, path))
     }
 
-    toString(formatZ){
+    toString(formatZ) {
         const pathSeparator = formatZ ? '\0' : '\t';
         return this.metadata + pathSeparator + this.paths.join(pathSeparator);
     }
 }
 
-exports.FileDiffManager = class {
-    constructor(formatZ){
+exports.FileDiffManager = class extends exports.CommandCombiner {
+    constructor(command, args, repo, formatZ) {
+        super(command, args, repo)
         this.formatZ = formatZ;
     }
 
-    parse(str, excludePaths){
+    parse(str, excludePaths) {
         const nullsplit = str.split("\0");
         const data = [];
-        while(nullsplit.length > 0){
+        while (nullsplit.length > 0) {
             const metadata = nullsplit.shift();
-            if(metadata == ''){
+            if (metadata == '') {
                 continue;
             }
             const paths = [nullsplit.shift()];
             const metaElements = metadata.split(" ");
-            const status = metaElements[metaElements.length -1][0]
-            if(status == "C" || status == "R"){
+            const status = metaElements[metaElements.length - 1][0]
+            if (status == "C" || status == "R") {
                 paths.push(nullsplit.shift());
             }
             data.push(new exports.FileDiff(metadata, paths));
         }
 
-        if(excludePaths !== undefined){
-            return data.filter(fileDiff => !excludePaths.has(fileDiff.paths[0])); 
+        if (excludePaths !== undefined) {
+            return data.filter(fileDiff => !excludePaths.has(fileDiff.paths[0]));
         }
 
         return data;
     }
 
-    convertToMeta(fileDiffList, subrepoPath){
+    convertToMeta(fileDiffList, subrepoPath) {
         fileDiffList.map(diff => diff.addPathParent(subrepoPath));
         return fileDiffList;
     }
 
-    combineToString(fileDiffLists){
+    combineToString(fileDiffLists) {
         const listSeparator = this.formatZ ? '\0' : '\n';
         const diffList = fileDiffLists.reduce((flattened, toFlatten) => flattened.concat(toFlatten));
         return diffList.map(diff => diff.toString(this.formatZ)).join(listSeparator);
     }
 };
 
-exports.PatchManager = class {
-    parse(str, excludePaths){
+exports.PatchManager = class extends exports.CommandCombiner {
+    parse(str, excludePaths) {
         return str;
     }
 
-    convertToMeta(str, subrepoPath){
+    convertToMeta(str, subrepoPath) {
         return str;
     }
 
-    combineToString(strList){
+    combineToString(strList) {
         return strList.filter(str => str.length > 0).join("\n");
     }
 }
 
-exports.StatManager = class {
-    parse(str, excludePaths){
+exports.StatManager = class extends exports.CommandCombiner {
+    parse(str, excludePaths) {
         return str;
     }
 
-    convertToMeta(str, subrepoPath){
+    convertToMeta(str, subrepoPath) {
         return str;
     }
 
-    combineToString(strList){
+    combineToString(strList) {
         return strList.filter(str => str.length > 0).join("\n");
     }
 }

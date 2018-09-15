@@ -31,7 +31,7 @@
 "use strict";
 
 const assert = require("chai").assert;
-const co     = require("co");
+const co = require("co");
 
 const ArgumentParser = require("argparse").ArgumentParser;
 const DiffIndex = require("../../lib/util/diff_index");
@@ -41,40 +41,55 @@ const RepoASTTestUtil = require("../../lib/util/repo_ast_test_util");
 describe("DiffIndex", function () {
     // Will always read "x".
 
-            // Define repos with commits
-            // state: "a=S:C2-1 foo=bar;Bmaster=2|b=S:C3-1 foo2=bar2;Bmaster=3",
+    // Define repos with commits
+    // state: "a=S:C2-1 foo=bar;Bmaster=2|b=S:C3-1 foo2=bar2;Bmaster=3",
 
-            // Define metarepo with sub repo with commits
-            // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3",
+    // Define metarepo with sub repo with commits
+    // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3",
 
-            // Define metarepo with sub repo with commits and local changes in subrepo
-            // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3; I f1=m; Osub W f2=m2",
+    // Define metarepo with sub repo with commits and local changes in subrepo
+    // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3; I f1=m; Osub W f2=m2",
 
     const cases = {
         "no_change": {
             state: "x=S",
             args: ["HEAD"],
-            expected: [],
+            expectedLinesContain: [],
+        },
+        "no_change_patch": {
+            state: "x=S",
+            args: ["--patch", "HEAD"],
+            expectedLinesContain: [],
+        },
+        "no_change_stat": {
+            state: "x=S",
+            args: ["--stat", "HEAD"],
+            expectedLinesContain: [],
+        },
+        "no_change_patchstat": {
+            state: "x=S",
+            args: ["--patch-with-stat", "HEAD"],
+            expectedLinesContain: [],
         },
         "deleted": {
             state: "x=S:I README.md",
             args: ["HEAD"],
-            expected: ["D\tREADME.md"],
+            expectedLinesContain: ["D\tREADME.md"],
         },
         "deleted_in_sub": {
             state: "a=S|x=U:I f1=blah2; Os I README.md",
             args: ["HEAD"],
-            expected: ["A\tf1","D\ts/README.md"],
+            expectedLinesContain: ["A\tf1", "D\ts/README.md"],
         },
         "modified_in_sub": {
             state: "a=S|x=U:Os I README.md=blah3",
             args: ["HEAD"],
-            expected: ["M\ts/README.md"]
+            expectedLinesContain: ["M\ts/README.md"]
         }
     };
     Object.keys(cases).forEach(caseName => {
         const c = cases[caseName];
-        it(caseName, co.wrap(function *() {
+        it(caseName, co.wrap(function* () {
 
             const written = yield RepoASTTestUtil.createMultiRepos(c.state);
             const repo = written.repos.x;
@@ -86,10 +101,12 @@ describe("DiffIndex", function () {
             const result = yield DiffIndex.diffIndex(repo, parsedArgs);
             const resultLines = result.split('\n').filter(val => val !== '');
 
-            assert.equal(resultLines.length, c.expected.length, "Result: ".concat(JSON.stringify(result)));
-            let i;
-            for (i = 0; i < resultLines.length; i++) {
-                assert.include(resultLines[i], c.expected[i]);
+            if (c.expectedLinesContain !== undefined) {
+                assert.equal(resultLines.length, c.expectedLinesContain.length, "Result: ".concat(JSON.stringify(result)));
+                let i;
+                for (i = 0; i < resultLines.length; i++) {
+                    assert.include(resultLines[i], c.expectedLinesContain[i]);
+                }
             }
         }));
     });
