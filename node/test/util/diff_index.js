@@ -41,6 +41,15 @@ const RepoASTTestUtil = require("../../lib/util/repo_ast_test_util");
 describe("DiffIndex", function () {
     // Will always read "x".
 
+            // Define repos with commits
+            // state: "a=S:C2-1 foo=bar;Bmaster=2|b=S:C3-1 foo2=bar2;Bmaster=3",
+
+            // Define metarepo with sub repo with commits
+            // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3",
+
+            // Define metarepo with sub repo with commits and local changes in subrepo
+            // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3; I f1=m; Osub W f2=m2",
+
     const cases = {
         "no_change": {
             state: "x=S",
@@ -52,6 +61,16 @@ describe("DiffIndex", function () {
             args: ["HEAD"],
             expected: ["D\tREADME.md"],
         },
+        "deleted_in_sub": {
+            state: "a=S|x=U:I f1=blah2; Os I README.md",
+            args: ["HEAD"],
+            expected: ["A\tf1","D\ts/README.md"],
+        },
+        "modified_in_sub": {
+            state: "a=S|x=U:Os I README.md=blah3",
+            args: ["HEAD"],
+            expected: ["M\ts/README.md"]
+        }
     };
     Object.keys(cases).forEach(caseName => {
         const c = cases[caseName];
