@@ -609,6 +609,25 @@ No submodules found from ${colors.yellow(filename)}.`);
 };
 
 /**
+ * Better version of resolvePaths.
+ * 
+ * @param {String []} paths list of normalized paths relative to the meta root
+ * @param {String []} submodules list of submodule paths 
+ */
+exports.mapPathsToRepos = function(paths, submodules){
+    assert.isArray(paths);
+    assert.isArray(submodules);
+
+    const pathMap = {};
+    for (const path of paths){
+        const subs = exports.getSubmodulesInPath(path)
+        subs.forEach()
+
+    }
+
+}
+
+/**
  * Return a map from submodule name to an array of paths (relative to the root
  * of each submodule) identified by the specified `paths`, indicating one of
  * the submodule names in the specified `indexSubNames`.  Check each path to
