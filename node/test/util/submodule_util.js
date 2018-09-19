@@ -857,6 +857,127 @@ describe("SubmoduleUtil", function () {
             }));
         });
     });
+    describe("mapPathsToRepos", function () {
+        // Work off of 'x'.
+
+        const cases = {
+            // "trivial": {
+            //     subNames: [],
+            //     paths: [],
+            //     open: [],
+            //     expected: {},
+            // },
+            // "path to closed sub": {
+            //     subNames: ["s"],
+            //     paths: ["s"],
+            //     open: [],
+            //     expected: { ".": ["s"] },
+            // },
+            // "path to open sub": {
+            //     subNames: ["s"],
+            //     paths: ["s"],
+            //     open: ["s"],
+            //     expected: { "s": ["."] },
+            // },
+            // "inside path": {
+            //     subNames: ["s"],
+            //     paths: ["s/README.md"],
+            //     open: ["s"],
+            //     expected: { "s": ["README.md"]},
+            // },
+            // "inside but not open": {
+            //     subNames: ["s"],
+            //     paths: ["s/README.md"],
+            //     open: [],
+            //     expected: {}, //???
+            // },
+            // "two inside": {
+            //     subNames: ["s", "x/y", "a/b"],
+            //     paths: ["s/x", "s/a"],
+            //     open: ["s"],
+            //     expected: { s: ["x","a"]},
+            // },
+            // "inside path with submodule path": {
+            //     subNames: ["s"],
+            //     paths: ["s/README.md", "s"],
+            //     open: ["s"],
+            //     expected: { "s": ["README.md", "."]},
+            // },
+            // "two contained": {
+            //     subNames: ["a/b", "a/c"],
+            //     paths: ["a"],
+            //     open: [],
+            //     expected: {
+            //         ".": ["a"],
+            //     },
+            // },
+            // "two specified": {
+            //     subNames: ["a/b", "a/c"],
+            //     paths: ["a/b", "a/c"],
+            //     open: [],
+            //     expected: {
+            //         ".": ["a/b", "a/c"],
+            //     },
+            // },
+            // "path not in sub": {
+            //     subNames: ["s"],
+            //     paths: ["README.md"],
+            //     open: ["s"],
+            //     expected: {".": ["README.md"]},
+            // },
+            // "path not in sub (but has a slash)": {
+            //     subNames: ["s"],
+            //     paths: ["t/README.md"],
+            //     open: ["s"],
+            //     expected: {".": ["t/README.md"]},
+            // },
+            // "path not in sub, fail": {
+            //     subNames: ["s"],
+            //     paths: ["README.md"],
+            //     open: ["s"],
+            //     expected: {".": ["README.md"]}
+            // },
+            // "path of sub": {
+            //     subNames: ["s"],
+            //     paths: ["s"],
+            //     open: ["s"],
+            //     failOnUnprefixed: true,
+            //     expected: {
+            //         "s": ["."]
+            //     }
+            // },
+            // "filename starts with subname but not in it": {
+            //     subNames: ["s"],
+            //     paths: ["sam"],
+            //     open: ["s"],
+            //     expected: {".": ["sam"]},
+            // },
+            "trivial" : {
+                subNames: [],
+                paths: [],
+                expected: {}
+            },
+            "root paths": {
+                subNames: ["a", "b"],
+                paths: ["x/y", "m/n"],
+                expected: {".": ["x/y", "m/n"]}
+            },
+            "sub paths": {
+                subNames: ["a", "b"],
+                paths: ["x/y", "a/b", "b/c/d"],
+                expected: {".": ["x/y"], "a": ["b"], "b": ["b/c/d"]}
+            }
+        };
+        Object.keys(cases).forEach(caseName => {
+            const c = cases[caseName];
+            it(caseName, function () {
+                let result = SubmoduleUtil.mapPathsToRepos(c.paths,
+                                                           c.subNames);
+                assert.deepEqual(result, c.expected);
+
+            });
+        });
+    });
 
     describe("resolvePaths", function () {
         // Work off of 'x'.

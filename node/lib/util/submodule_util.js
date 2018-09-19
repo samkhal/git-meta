@@ -620,11 +620,18 @@ exports.mapPathsToRepos = function(paths, submodules){
 
     const pathMap = {};
     for (const path of paths){
-        const subs = exports.getSubmodulesInPath(path)
-        subs.forEach()
-
+        for(const sub of submodules){
+            if(path.startsWith(sub)){
+                pathMap[sub] = pathMap[sub] || [];
+                pathMap[sub].push(path);
+                break;
+            }
+        }
+        // If it's not in a submodule, add it to the root
+        pathMap["."] = pathMap["."] || [];
+        pathMap["."].push(path);
     }
-
+    return pathMap;
 }
 
 /**
