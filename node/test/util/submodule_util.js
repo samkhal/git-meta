@@ -965,13 +965,16 @@ describe("SubmoduleUtil", function () {
             "sub paths": {
                 subNames: ["a", "b"],
                 paths: ["x/y", "a/b", "b/c/d"],
-                expected: {".": ["x/y"], "a": ["b"], "b": ["b/c/d"]}
+                expected: {".": ["x/y"], "a": ["b"], "b": ["c/d"]}
             }
         };
         Object.keys(cases).forEach(caseName => {
             const c = cases[caseName];
             it(caseName, function () {
-                let result = SubmoduleUtil.mapPathsToRepos(c.paths,
+                const some_repo = "/repo";
+                let result = SubmoduleUtil.mapPathsToRepos(some_repo,
+                                                           c.paths,
+                                                           some_repo,
                                                            c.subNames);
                 assert.deepEqual(result, c.expected);
 
