@@ -63,6 +63,7 @@ const stash        = require("./cmd/stash");
 const status       = require("./cmd/status");
 const syncrefs     = require("./cmd/syncrefs");
 const submodule    = require("./cmd/submodule");
+const updateIndex  = require("./cmd/update_index");
 const UserError    = require("./util/user_error");
 const version      = require("./cmd/version");
 
@@ -150,6 +151,7 @@ const commands = {
     "submodule": submodule,
     "status": status,
     "sync-refs": syncrefs,
+    "update-index": updateIndex,
     "version": version,
 };
 
@@ -200,7 +202,6 @@ const whitelist = new Set([
     // Mostly supported by default
     "rev-list", // Mostly supported except for specifying paths
     "rev-parse", // Should be fully supported, but some workdir-related things might break it
-    "update-index", // Fully supported except for specifying paths
 
 ])
 
