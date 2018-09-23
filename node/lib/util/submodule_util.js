@@ -625,19 +625,21 @@ exports.mapPathsToRepos = function (path_root, paths, git_root, submodules) {
     const full_paths = paths.map(p => path.resolve(path_root, p));
     const rel_and_full_subs = submodules.map(sub => [sub, path.resolve(git_root, sub)]);
 
+    const relativePath = function(from, to){ 
+        const relative = path.relative(from, to);
+        if(relative === ""){
+            return ".";
+        }
+        return relative;
+    }
+
     const pathMap = {};
     for (const full_path of full_paths) {
         let found_sub = false;
         for (const [rel_sub, full_sub] of rel_and_full_subs) {
             if (full_path.startsWith(full_sub)) {
-                const relative_path = path.relative(full_sub, full_path)
-                if (relative_path.length === 0) {
-                    pathMap[rel_sub] = pathMap[rel_sub] || [];
-                    pathMap[rel_sub].push(".");
-                    found_sub = true;
-                    break;
-                }
-                else if (relative_path[0] !== '.') {
+                const relative_path = relativePath(full_sub, full_path)
+                if (!relative_path.startsWith("..")) {
                     pathMap[rel_sub] = pathMap[rel_sub] || [];
                     pathMap[rel_sub].push(relative_path);
                     found_sub = true;
@@ -648,7 +650,7 @@ exports.mapPathsToRepos = function (path_root, paths, git_root, submodules) {
         if(!found_sub){
             // If it's not in a submodule, add it to the root
             pathMap["."] = pathMap["."] || [];
-            pathMap["."].push(path.relative(git_root, full_path));
+            pathMap["."].push(relativePath(git_root, full_path));
         }
     }
     return pathMap;

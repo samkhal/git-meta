@@ -33,22 +33,27 @@
 const co = require("co");
 
 /**
- * This module contains methods for implementing the `diff-files` command.
+ * This module contains methods for implementing the `ls-files` command.
  */
 
 /**
- * help text for the `diff-files` command
+ * help text for the `ls-files` command
  * @property {String}
  */
-exports.helpText = `Compares files int the working tree and the index in the meta-repo and open submodules.`;
+exports.helpText = `List files in the meta-repo and open submodules.`;
 
 /**
- * description of the `diff-index` command
+ * description of the `rebase` command
  * @property {String}
  */
-exports.description =`TODO`;
+exports.description =`Display information about combinations of files in the
+directory cache index of the meta-repository and or open submodules.  The
+default behavior is to list all files from the current working director down,
+inluding (relevant) files in the meta-repository and opened submodules.`;
 
 exports.configureParser = function (parser) {
+    // parser.addArgument(['--others'], {action: "storeTrue"});
+    // parser.addArgument(['--exclude-standard'], {action: "storeTrue"});
     const forwardArgs = require("../util/forward_args").forwardArgs;
 
     parser.addArgument('-z', {
@@ -56,42 +61,31 @@ exports.configureParser = function (parser) {
     });
 
     forwardArgs(parser, [
-        {name: "--diff-filter", nargs: "?"},
-        {name: "--cached", nargs: 0},
-        {name: "--encoding", nargs: "?"},
-        {name: "--root", nargs: 0},
-        {name: ["-M", "--find-renames"], nargs: "?"},
+        {name: ["-c", "--cached"], nargs: 0},
+        {name: ["-d", "--deleted"], nargs: 0},
+        {name: ["-m", "--modified"], nargs: 0},
+        {name: ["-o", "--others"], nargs: 0},
+        {name: "--exclude-standard", nargs: 0},
     ]);
-
-    parser.addArgument('-C', {
-        nargs: "?",
-        help: "Ignored",
-    })
-
-    parser.addArgument(['-p', '-u', '--patch'], {action: "storeTrue"});
-    parser.addArgument(['--stat'], {action: "storeTrue"});
-    parser.addArgument(['--raw'], {action: "storeTrue"});
-    parser.addArgument(['--patch-with-stat'], {action: "storeTrue"});
-    parser.addArgument(['--patch-with-raw'], {action: "storeTrue"});
-
-    parser.addArgument("paths", {
-        nargs: "*"
-    })
 };
 
 /**
- * Execute the `diff-files` command according to the specified `args`.
+ * Execute the `ls-files` command according to the specified `args`.
  *
  * @async
  * @param {Object} args
+ * @param {String} args.commit
  */
 exports.executeableSubcommand = co.wrap(function *(args) {
 
-    const DiffFiles = require("../util/diff_files");
+    const fs   = require("fs-promise");
+
+    const LsFiles = require("../util/ls_files");
     const GitUtil = require("../util/git_util");
 
     const repo = yield GitUtil.getCurrentRepo();
+    const cwd = yield fs.realpath(process.cwd());
 
-    const fileDiff = yield DiffFiles.diffFiles(repo, args);
-    process.stdout.write(fileDiff);
+    const output = yield LsFiles.lsFiles(repo, args, cwd);
+    process.stdout.write(output);
 });

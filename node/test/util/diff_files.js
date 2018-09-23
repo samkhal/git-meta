@@ -34,61 +34,50 @@ const assert = require("chai").assert;
 const co = require("co");
 
 const ArgumentParser = require("argparse").ArgumentParser;
-const DiffIndex = require("../../lib/util/diff_index");
-const DiffIndexCmd = require("../../lib/cmd/diff_index");
+const DiffFiles = require("../../lib/util/diff_files");
+const DiffFilesCmd = require("../../lib/cmd/diff_files");
 const RepoASTTestUtil = require("../../lib/util/repo_ast_test_util");
 
-describe("DiffIndex", function () {
-    // Will always read "x".
-
-    // Define repos with commits
-    // state: "a=S:C2-1 foo=bar;Bmaster=2|b=S:C3-1 foo2=bar2;Bmaster=3",
-
-    // Define metarepo with sub repo with commits
-    // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3",
-
-    // Define metarepo with sub repo with commits and local changes in subrepo
-    // state: "a=S:C2-1 foo=bar; Bmaster=2|x=S:C3-1 foo2=bar2, sub=Sa:2; Bmaster=3; I f1=m; Osub W f2=m2",
-
+describe("DiffFiles", function () {
     const cases = {
         "no_change": {
             state: "x=S",
-            args: ["HEAD"],
+            args: [],
             expectedLinesContain: [],
         },
         "no_change_patch": {
             state: "x=S",
-            args: ["--patch", "HEAD"],
+            args: ["--patch"],
             expectedLinesContain: [],
         },
         "no_change_stat": {
             state: "x=S",
-            args: ["--stat", "HEAD"],
+            args: ["--stat"],
             expectedLinesContain: [],
         },
         "no_change_patchstat": {
             state: "x=S",
-            args: ["--patch-with-stat", "HEAD"],
+            args: ["--patch-with-stat"],
             expectedLinesContain: [],
         },
         "deleted": {
-            state: "x=S:I README.md",
-            args: ["HEAD"],
+            state: "x=S:W README.md",
+            args: [],
             expectedLinesContain: ["D\tREADME.md"],
         },
         "deleted_in_sub": {
-            state: "a=S|x=U:I f1=blah2; Os I README.md",
-            args: ["HEAD"],
-            expectedLinesContain: ["A\tf1", "D\ts/README.md"],
+            state: "a=S|x=U:Os W README.md",
+            args: [],
+            expectedLinesContain: ["D\ts/README.md"],
         },
         "modified_in_sub": {
-            state: "a=S|x=U:Os I README.md=blah3",
-            args: ["HEAD"],
+            state: "a=S|x=U:Os W README.md=blah3",
+            args: [],
             expectedLinesContain: ["M\ts/README.md"]
         },
         "modified path in sub": {
-            state: "a=S|x=U:Os I README.md=x,other=y",
-            args: ["HEAD", "--", "s/README.md"],
+            state: "a=S|x=U:Os W README.md=x,other=y",
+            args: [],
             expectedLinesContain: ["M\ts/README.md"]
         }
     };
@@ -101,10 +90,10 @@ describe("DiffIndex", function () {
             const cwd = repo.workdir();
 
             const parser = new ArgumentParser()
-            DiffIndexCmd.configureParser(parser);
+            DiffFilesCmd.configureParser(parser);
             const parsedArgs = parser.parseArgs(c.args)
 
-            const result = yield DiffIndex.diffIndex(repo, parsedArgs, cwd);
+            const result = yield DiffFiles.diffFiles(repo, parsedArgs, cwd);
             const resultLines = result.split('\n').filter(val => val !== '');
 
             if (c.expectedLinesContain !== undefined) {

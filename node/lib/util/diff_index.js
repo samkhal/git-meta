@@ -31,6 +31,7 @@
 "use strict";
 
 const assert = require("chai").assert;
+const path = require("path");
 const co = require("co");
 const NodeGit = require("nodegit");
 
@@ -48,8 +49,11 @@ const DiffListUtil = require("../util/diff_list_util");
  * @param {NodeGit.Repository} repo
  * @return {String}
  */
-exports.diffIndex = co.wrap(function* (repo, args) {
+exports.diffIndex = co.wrap(function* (repo, args, cwd) {
     assert.instanceOf(repo, NodeGit.Repository);
+    if( cwd === undefined){
+        cwd = path.resolve();
+    }
 
     // const ChildProcess = require('child_process');
     // const ChildProcess = require("child-process-promise");
@@ -77,45 +81,24 @@ exports.diffIndex = co.wrap(function* (repo, args) {
     // const result = yield runGitCommand("status", []);//.then(result =>{console.log(`output ${result}`);});
     // console.log(result);
 
-    const subNames = new Set(yield SubmoduleUtil.getSubmoduleNames(repo));
-    const openSubs = yield SubmoduleUtil.listOpenSubmodules(repo);
-
-    const metaExcludePaths = subNames;
-    metaExcludePaths.add(SubmoduleConfigUtil.modulesFileName);
-
-    let subPaths;
-    if (args.paths.length > 0) {
-        const indexSubNames = yield SubmoduleUtil.getSubmoduleNames(
-            repo);
-        const openSubmodules = yield SubmoduleUtil.listOpenSubmodules(
-            repo);
-        subPaths = SubmoduleUtil.resolvePaths(args.paths, indexSubNames, openSubmodules);
-    }
-
-    const repoInfo = {
-        "repo": repo,
-        "openSubs": openSubs,
-        "metaExcludePaths": metaExcludePaths
-    };
-
     if (args.forwardArgs === undefined) {
         args.forwardArgs = [];
     }
 
     const handleRaw = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['-z', '--raw', args.commit]);
-        return yield (new DiffListUtil.FileDiffManager("diff-index", commandArgs, repo, args.z)).run();
+        return yield (new DiffListUtil.FileDiffManager("diff-index", commandArgs, repo, args.z)).run(cwd, args.paths);
     })
 
 
     const handlePatch = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['--patch', args.commit]);
-        return yield (new DiffListUtil.PatchManager("diff-index", commandArgs, repo)).run();
+        return yield (new DiffListUtil.PatchManager("diff-index", commandArgs, repo)).run(cwd, args.paths);
     })
 
     const handleStat = co.wrap(function* () {
         const commandArgs = args.forwardArgs.concat(['--stat', args.commit]);
-        return yield (new DiffListUtil.StatManager("diff-index", commandArgs, repo)).run();
+        return yield (new DiffListUtil.StatManager("diff-index", commandArgs, repo)).run(cwd, args.paths);
     })
 
     let output_patch = args.patch || args.patch_with_stat || args.patch_with_raw;

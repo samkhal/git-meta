@@ -40,7 +40,7 @@
  * See https://git-scm.com/docs/git-diff-index#_raw_output_format
  */
 
-const Path = require("path");
+const path = require("path");
 const co = require("co");
 
 const GitUtil = require("../util/git_util");
@@ -57,7 +57,7 @@ exports.CommandCombiner = class {
     /**
      * @param {Array} list file paths relative to metarepo root
      */
-    async run(paths) {
+    async run(cwd, paths) {
         if (paths === undefined) {
             paths = []
         }
@@ -70,11 +70,9 @@ exports.CommandCombiner = class {
 
         let pathMap = {};
         if (paths.length > 0) {
-            const indexSubNames = await SubmoduleUtil.getSubmoduleNames(
-                repo);
             const openSubmodules = await SubmoduleUtil.listOpenSubmodules(
-                repo);
-            pathMap = SubmoduleUtil.resolvePaths(paths, indexSubNames, openSubmodules);
+                this.repo);
+            pathMap = SubmoduleUtil.mapPathsToRepos(cwd, paths, this.repo.workdir(), openSubmodules)
         }
 
         const results = [];
@@ -121,7 +119,7 @@ exports.FileDiff = class {
     }
 
     addPathParent(pathToRoot) {
-        this.paths = this.paths.map(path => Path.join(pathToRoot, path))
+        this.paths = this.paths.map(single_path => path.join(pathToRoot, single_path))
     }
 
     toString(formatZ) {
@@ -200,3 +198,87 @@ exports.StatManager = class extends exports.CommandCombiner {
     }
 }
 
+exports.FileListManager = class extends exports.CommandCombiner {
+    constructor(command, args, repo, formatZ) {
+        super(command, args, repo)
+        this.formatZ = formatZ;
+    }
+
+    async run(cwd, paths) {
+        const openSubs = await SubmoduleUtil.listOpenSubmodules(this.repo);
+        const mapped = SubmoduleUtil.mapPathsToRepos('', [cwd], this.repo.workdir(), openSubs);
+        this.runningInRepo = Object.keys(mapped)[0];
+        this.relativeRunPath = mapped[this.runningInRepo][0];
+
+        return await super.run(cwd, paths);
+    }
+
+    async runForMetarepo(repo, paths, excludePaths) {
+        // If we're not in the repo, no output
+        if(this.runningInRepo !== "."){
+            return [];
+        }
+
+        let metaPathArgs = [];
+        if (paths.length > 0) {
+            metaPathArgs = ["--"].concat(paths);
+        }
+
+        const runPath = path.resolve(this.repo.workdir(), this.relativeRunPath);
+        const metaOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(metaPathArgs), runPath);
+
+        const files = this.parse(metaOutputStr, excludePaths);
+        if (excludePaths !== undefined) {
+            return files.filter(filename => !excludePaths.has(filename));
+        }
+        return files;
+    }
+
+    async runForSubrepo(subRepoName, paths) {
+        let runPath;
+        if(this.runningInRepo === "."){
+            runPath = path.resolve(this.repo.workdir(), subRepoName);
+            // Check if the run dir excludes this subrepro
+            const trueRunPathToSubmodule = path.relative(path.resolve(this.repo.workdir(), this.relativeRunPath), runPath);
+            if(trueRunPathToSubmodule.startsWith("..")){
+                return []; // nothing to do here
+            }
+        }
+        else if(this.runningInRepo === subRepoName){
+            runPath = path.resolve(this.repo.workdir(), subRepoName, this.relativeRunPath);
+        }
+        else{
+            return []; //Not running in the metarepo or this subrepo, nothing to do here
+        }
+
+        let subPathArgs = [];
+        if (paths.length > 0) {
+            subPathArgs = ["--"].concat(paths);
+        }
+
+        const subOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(subPathArgs), runPath);
+        const fileList = this.parse(subOutputStr);
+
+        // If running from meta repo, need to prepend a path based on the relative path
+        if(this.runningInRepo === "."){
+            const prependPath = path.relative(this.relativeRunPath, subRepoName);
+            return fileList.map(file => prependPath + path.sep + file);
+        }
+        return fileList;
+    }
+
+    parse(str, excludePaths) {
+        const nullsplit = str.split('\0').filter(line => line.length > 0);
+        return nullsplit;
+    }
+
+    convertToMeta(fileList, subrepoPath) {
+        return fileList.map(file => subrepoPath + path.sep + file);
+    }
+
+    combineToString(listOfFileLists) {
+        const listSeparator = this.formatZ ? '\0' : '\n';
+        const fileList = listOfFileLists.reduce((flattened, toFlatten) => flattened.concat(toFlatten));
+        return fileList.filter(str => str.length > 0).join(listSeparator);
+    }
+}

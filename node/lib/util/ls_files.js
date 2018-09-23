@@ -37,16 +37,7 @@ const path    = require("path");
 
 const DiffListUtil         = require("../util/diff_list_util");
 
-/**
- * Outputs the result of diff-files in the specified repo and open submodules,
- *  Note that the order of the list is
- * not defined.   
- *
- * @async
- * @param {NodeGit.Repository} repo
- * @return {String}
- */
-exports.diffFiles = co.wrap(function *(repo, args, cwd) {
+exports.lsFiles = co.wrap(function *(repo, args, cwd) {
     assert.instanceOf(repo, NodeGit.Repository);
     if( cwd === undefined){
         cwd = path.resolve();
@@ -56,37 +47,6 @@ exports.diffFiles = co.wrap(function *(repo, args, cwd) {
         args.forwardArgs = [];
     }
 
-    const handleRaw = co.wrap(function* () {
-        const commandArgs = args.forwardArgs.concat(['-z', '--raw']);
-        return yield (new DiffListUtil.FileDiffManager("diff-files", commandArgs, repo, args.z)).run(cwd, args.paths);
-    })
-
-
-    const handlePatch = co.wrap(function* () {
-        const commandArgs = args.forwardArgs.concat(['--patch']);
-        return yield (new DiffListUtil.PatchManager("diff-files", commandArgs, repo)).run(cwd, args.paths);
-    })
-
-    const handleStat = co.wrap(function* () {
-        const commandArgs = args.forwardArgs.concat(['--stat']);
-        return yield (new DiffListUtil.StatManager("diff-files", commandArgs, repo)).run(cwd, args.paths);
-    })
-
-    let output_patch = args.patch || args.patch_with_stat || args.patch_with_raw;
-    let output_stat = args.stat || args.patch_with_stat;
-    let output_raw = args.raw || (!output_patch && !output_stat); // output raw if patch and stat are not selected
-
-
-    let output = ""
-    if (output_raw) {
-        output += yield handleRaw();
-    }
-    if (output_stat) {
-        output += yield handleStat();
-    }
-    if (output_patch) {
-        output += yield handlePatch();
-    }
-    return output;
-
+    const commandArgs = args.forwardArgs.concat(['-z']);
+    return yield (new DiffListUtil.FileListManager("ls-files", commandArgs, repo, args.z)).run(cwd, args.paths);
 });

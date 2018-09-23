@@ -48,7 +48,8 @@ const diffIndex    = require("./cmd/diff_index");
 const diffFiles    = require("./cmd/diff_files");
 const Forward      = require("./cmd/forward");
 const include      = require("./cmd/include");
-const listFiles    = require("./cmd/list_files");
+// const listFiles    = require("./cmd/list_files");
+const lsFiles    = require("./cmd/ls_files");
 const merge        = require("./cmd/merge");
 const open         = require("./cmd/open");
 const pull         = require("./cmd/pull");
@@ -133,7 +134,8 @@ const commands = {
     "diff-index": diffIndex,
     "diff-files": diffFiles,
     "include": include,
-    "ls-files": listFiles,
+    // "ls-files": listFiles,
+    "ls-files": lsFiles,
     "merge": merge,
     "add-submodule": addSubmodule,
     "open": open,
@@ -189,13 +191,27 @@ const blacklist = new Set([
     "worktree",
 ]);
 
+// Whitelist for forwarded commands
+const whitelist = new Set([
+    // Fully supported by default
+    "config", 
+    "show-ref",
+
+    // Mostly supported by default
+    "rev-list", // Mostly supported except for specifying paths
+    "rev-parse", // Should be fully supported, but some workdir-related things might break it
+    "update-index", // Fully supported except for specifying paths
+
+])
+
 // If the first argument matches a forwarded sub-command, handle it manually.
 // I was not able to get ArgParse to allow unknown flags, e.g.
 // `git meta branch -r` to be passed to the REMAINDER positional argument on a
 // sub-parser level.
 
 if (2 < process.argv.length &&
-    !blacklist.has(process.argv[2]) &&
+    !blacklist.has(process.argv[2]) && // blacklist is redundant here but we'll keep it around to refer to
+    whitelist.has(process.argv[2]) &&
     !(process.argv[2] in commands)) {
     const name = process.argv[2];
     const args = process.argv.slice(3);
