@@ -67,6 +67,8 @@ const updateIndex  = require("./cmd/update_index");
 const UserError    = require("./util/user_error");
 const version      = require("./cmd/version");
 
+const checkAttr    = require("./cmd/check_attr");
+
 // see https://github.com/nodegit/nodegit/issues/827 -- this is required
 // to prevent random hard crashes with e.g. parallelism in index operations.
 // Eventually, this will be nodegit's default.
@@ -132,11 +134,8 @@ const commands = {
     "cherry-pick": cherryPick,
     "close": close,
     "commit": commit,
-    "diff-index": diffIndex,
-    "diff-files": diffFiles,
     "include": include,
     // "ls-files": listFiles,
-    "ls-files": lsFiles,
     "merge": merge,
     "add-submodule": addSubmodule,
     "open": open,
@@ -151,8 +150,14 @@ const commands = {
     "submodule": submodule,
     "status": status,
     "sync-refs": syncrefs,
-    "update-index": updateIndex,
     "version": version,
+
+    // Sam's commands
+    "check-attr": checkAttr,
+    "diff-index": diffIndex,
+    "diff-files": diffFiles,
+    "ls-files": lsFiles,
+    "update-index": updateIndex,
 };
 
 // Configure the parser with commands in alphabetical order.

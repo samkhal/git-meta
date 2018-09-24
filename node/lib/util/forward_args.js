@@ -50,7 +50,7 @@ exports.ForwardArgsAction.prototype.call = function(parser, namespace, values, o
 exports.forwardArgs = function(parser, argsToForward){
     argsToForward.map(arg => {
         parser.addArgument(arg.name, {
-            nargs: arg.nargs,
+            nargs: arg.nargs || 0,
             action: exports.ForwardArgsAction
         });
     });
