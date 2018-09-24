@@ -1,0 +1,13 @@
+#!/usr/bin/env bash
+
+# Records the inputs and outputs of a specified command to a log file, while still letting
+# the command act as normal
+# Usage: cmd-log <command> <args...>
+
+DIR=$(dirname $(readlink -f $0))
+CMD=$1
+mkdir -p $DIR/cmdlogs
+LOGFILE=$DIR/cmdlogs/$1.log
+echo >> $LOGFILE
+echo "Calling: " $@ >> $LOGFILE
+$@ | tee -a $LOGFILE

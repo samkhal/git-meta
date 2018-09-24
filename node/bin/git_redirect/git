@@ -1,6 +1,2 @@
 #!/usr/bin/env bash
-DIR=$(dirname $(readlink -f $0))
-LOGFILE=$DIR/git_redirect.log
-echo >> $LOGFILE
-echo "Calling: git meta" $@ >> $LOGFILE
-/usr/bin/git meta $@ | tee -a $LOGFILE
+cmd-log git-meta-client $@

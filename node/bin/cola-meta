@@ -1,3 +1,2 @@
 #!/usr/bin/env bash
-DIR=$(dirname $(readlink -f $0))
-PATH=$DIR/git_redirect:$PATH cola $@
+redirect-git-to "cmd-log git-meta-client" cola $@

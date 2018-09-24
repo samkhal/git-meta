@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+
+# Redirect calls to `git` to a different binary
+# Usage: redirect-git-to <command to replace git> <cmd that calls git> <args...>
+DIR=$(dirname $(readlink -f $0))
+
+GIT_REPLACEMENT=$1
+FAKE_PATH=$DIR/git_redirect
+mkdir -p $FAKE_PATH
+FILE=$FAKE_PATH/git
+
+cat << EOM >$FILE
+#!/usr/bin/env bash
+$GIT_REPLACEMENT \$@
+EOM
+chmod +x $FILE
+
+shift
+PATH=$FAKE_PATH:$PATH $@
