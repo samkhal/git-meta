@@ -530,7 +530,7 @@ foo
             };
         });
 
-        it(caseName, co.wrap(function *() {
+        it.skip(caseName, co.wrap(function *() {
             yield RepoASTTestUtil.testMultiRepoManipulator(c.state,
                                                            c.expected,
                                                            picker,

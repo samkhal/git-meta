@@ -59,7 +59,7 @@ exports.CommandCombiner = class {
      */
     async run(cwd, paths) {
         if (paths === undefined) {
-            paths = []
+            paths = [];
         }
 
         const subNames = new Set(await SubmoduleUtil.getSubmoduleNames(this.repo));
