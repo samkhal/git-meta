@@ -87,15 +87,10 @@ exports.execute = co.wrap(function *(name, args) {
         GitUtil.getRootGitDirectory(),
         name,
     ].concat(args);
-    try {
-        return ChildProcess.spawn("git", gitArgs, {
-            capture: ["stdout"],
-        }).then(result => {
-            return result.stdout.toString();
-        });
-    }
-    catch (e) {
-        process.exit(e.code);
-    }
+    return ChildProcess.spawn("git", gitArgs, {
+        capture: ["stdout"],
+    }).then(result => {
+        return result.stdout.toString();
+    });
 });
 

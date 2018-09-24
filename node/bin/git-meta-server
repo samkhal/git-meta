@@ -68,7 +68,8 @@ ipc.serve(
                     return;
                 }
 
-                gitMeta.runCommand(command.trim().split(" "), stdin).then(function (output){
+                gitMeta.runCommand(command.trim().split(" "), stdin)
+                .then(output => {
                     process.chdir(cwd); // change cwd back
 
                     const end_of_transmission = String.fromCharCode(4);
@@ -79,7 +80,8 @@ ipc.serve(
                     );
 
                     return;
-                });
+                })
+                .catch(err => ipc.log("Command threw an error:", err));
             }
         );
     }

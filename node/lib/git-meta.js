@@ -103,7 +103,7 @@ function configureSubcommand(parser, commandName, module) {
                 else {
                     console.error(error.stack);
                 }
-                process.exit(-1);
+                // process.exit(-1);
             });
         }
     });
@@ -214,11 +214,11 @@ exports.runCommand = async function (argv, stdin){
     // sub-parser level.
     let captured_stdout = "";
     
-    var unhook_intercept = intercept(function(txt) {
-        captured_stdout += txt;
+    var unhook_intercept = intercept(function(stdout) {
+        captured_stdout += stdout;
         return "";
-    });
-
+    }, function(stderr){});
+    
     if (0 < argv.length &&
         !blacklist.has(argv[0]) && // blacklist is redundant here but we'll keep it around to refer to
         whitelist.has(argv[0]) &&
@@ -227,12 +227,8 @@ exports.runCommand = async function (argv, stdin){
         const args = argv.slice(1);
         const result = await Forward.execute(name, args);
         process.stdout.write(result.trim()); //why do we have to trim?
-        // await Forward.execute(name, args).catch(() => {
-        //     process.exit(-1);
-        // });
     }
     else {
-        // const args = parser.parseArgs(argv);
         const args = parser.parseArgs(argv);
         await args.func(args, stdin);
     }

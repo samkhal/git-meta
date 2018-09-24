@@ -29,7 +29,11 @@ if not sys.stdin.isatty(): # Check if theres anything on stdin to read
 message = "{};{};{}".format(cwd, command, stdin)
 
 sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-sock.connect(server_address)
+try:
+    sock.connect(server_address)
+except ConnectionRefusedError:
+    print("Could not connect to socket; make sure the git-meta server is running!", file=sys.stderr)
+    exit(1)
 
 sock.send(message.encode('UTF-8'))
 
@@ -37,9 +41,13 @@ data = b''
 end_of_transmission = 0x04
 while True:
     data += sock.recv(4096)
-    if(data[-1] == end_of_transmission):
+    if not data:
+        print("Failed to recieve data from server!", file=sys.stderr)
+        exit(1)
+    elif data[-1] == end_of_transmission:
+        data = data[:-1]
         break
 sock.close()
     
-print(data[:-1].decode('UTF-8'), end='')
+print(data.decode('UTF-8'), end='')
 
