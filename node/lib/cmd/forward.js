@@ -88,8 +88,10 @@ exports.execute = co.wrap(function *(name, args) {
         name,
     ].concat(args);
     try {
-        yield ChildProcess.spawn("git", gitArgs, {
-            stdio: "inherit",
+        return ChildProcess.spawn("git", gitArgs, {
+            capture: ["stdout"],
+        }).then(result => {
+            return result.stdout.toString();
         });
     }
     catch (e) {

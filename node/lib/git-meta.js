@@ -90,8 +90,8 @@ function configureSubcommand(parser, commandName, module) {
     });
     module.configureParser(subParser);
     subParser.setDefaults({
-        func: function (args) {
-            module.executeableSubcommand(args)
+        func: async function (args, stdin) {
+            await module.executeableSubcommand(args, stdin)
             .catch(function (error) {
 
                 // If it's a 'UserError', don't print the stack, just the
@@ -205,22 +205,38 @@ const whitelist = new Set([
 
 ])
 
-// If the first argument matches a forwarded sub-command, handle it manually.
-// I was not able to get ArgParse to allow unknown flags, e.g.
-// `git meta branch -r` to be passed to the REMAINDER positional argument on a
-// sub-parser level.
+const intercept = require("intercept-stdout");
 
-if (2 < process.argv.length &&
-    !blacklist.has(process.argv[2]) && // blacklist is redundant here but we'll keep it around to refer to
-    whitelist.has(process.argv[2]) &&
-    !(process.argv[2] in commands)) {
-    const name = process.argv[2];
-    const args = process.argv.slice(3);
-    Forward.execute(name, args).catch(() => {
-        process.exit(-1);
+exports.runCommand = async function (argv, stdin){
+    // If the first argument matches a forwarded sub-command, handle it manually.
+    // I was not able to get ArgParse to allow unknown flags, e.g.
+    // `git meta branch -r` to be passed to the REMAINDER positional argument on a
+    // sub-parser level.
+    let captured_stdout = "";
+    
+    var unhook_intercept = intercept(function(txt) {
+        captured_stdout += txt;
+        return "";
     });
-}
-else {
-    const args = parser.parseArgs();
-    args.func(args);
+
+    if (0 < argv.length &&
+        !blacklist.has(argv[0]) && // blacklist is redundant here but we'll keep it around to refer to
+        whitelist.has(argv[0]) &&
+        !(argv[0] in commands)) {
+        const name = argv[0];
+        const args = argv.slice(1);
+        const result = await Forward.execute(name, args);
+        process.stdout.write(result.trim()); //why do we have to trim?
+        // await Forward.execute(name, args).catch(() => {
+        //     process.exit(-1);
+        // });
+    }
+    else {
+        // const args = parser.parseArgs(argv);
+        const args = parser.parseArgs(argv);
+        await args.func(args, stdin);
+    }
+    
+    unhook_intercept();
+    return captured_stdout;
 }

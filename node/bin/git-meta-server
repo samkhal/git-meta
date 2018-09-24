@@ -30,5 +30,64 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-require("./../lib/git-meta.js");
+// Create a server to respond to git-meta requests
+
+const gitMeta = require("./../lib/git-meta.js");
+
+const ipc = require('node-ipc');
+
+ipc.config.id = 'gitmeta';
+ipc.config.retry= 1500;
+ipc.config.rawBuffer=true;
+ipc.config.encoding='ascii';
+
+ipc.serve(
+    function(){
+        ipc.server.on(
+            'connect',
+            function(socket){
+                ipc.log("Connected");
+            }
+        );
+
+        ipc.server.on(
+            'data',
+            function(data, socket){
+                const message = data.toString()
+                ipc.log('Got a message: ', message);
+                const [command_workdir, command, ...stdin_arr] = message.split(";");
+                const stdin = stdin_arr.join(";");
+
+                const cwd = process.cwd();
+                try{
+                    process.chdir(command_workdir);
+                    ipc.log("Changing dir to ", command_workdir);
+                }
+                catch(err){
+                    ipc.log("Could not change to dir to ", command_workdir);
+                    return;
+                }
+
+                gitMeta.runCommand(command.trim().split(" "), stdin).then(function (output){
+                    process.chdir(cwd); // change cwd back
+
+                    const end_of_transmission = String.fromCharCode(4);
+
+                    ipc.server.emit(
+                        socket,
+                        output + end_of_transmission
+                    );
+
+                    return;
+                });
+            }
+        );
+    }
+);
+
+ipc.server.start();
+
+
+
+
 

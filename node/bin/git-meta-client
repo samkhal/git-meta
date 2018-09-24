@@ -1,0 +1,45 @@
+#!/usr/bin/env python3
+# -*- coding: UTF-8 -*-
+
+"""
+Client for git-meta-server
+
+This light client will capture
+- Current working directory
+- Args
+- Stdin
+and send it all to the server over a unix socket.
+
+It will print out the server's response.
+"""
+
+import socket
+import os
+import sys
+
+server_address = '/tmp/app.gitmeta'
+
+# Get all stdin
+cwd = os.getcwd()
+command = " ".join(sys.argv[1:])
+stdin = ""
+if not sys.stdin.isatty(): # Check if theres anything on stdin to read
+    stdin = sys.stdin.read()
+
+message = "{};{};{}".format(cwd, command, stdin)
+
+sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+sock.connect(server_address)
+
+sock.send(message.encode('UTF-8'))
+
+data = b''
+end_of_transmission = 0x04
+while True:
+    data += sock.recv(4096)
+    if(data[-1] == end_of_transmission):
+        break
+sock.close()
+    
+print(data[:-1].decode('UTF-8'), end='')
+

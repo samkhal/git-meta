@@ -36,9 +36,12 @@
     "deeper": "",
     "fs-promise": "",
     "group-by": "",
+    "intercept-stdout": "^0.1.2",
+    "node-ipc": "^9.1.1",
     "nodegit": "^0.21.1",
     "rimraf": "",
     "split": "",
+    "v8-compile-cache": "^2.0.2",
     "walk": ""
   },
   "devDependencies": {

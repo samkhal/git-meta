@@ -81,13 +81,11 @@ exports.configureParser = function (parser) {
  * @param {Object} args
  * @param {String} args.commit
  */
-exports.executeableSubcommand = co.wrap(function *(args) {
+exports.executeableSubcommand = co.wrap(function *(args, stdin) {
     let files;
     if(args.stdin){
         const separator = args.z ? "\0" : "\n";
-        const fs = require("fs");
-        const input = fs.readFileSync(0, "utf-8");
-        files = input.split(separator).filter(file => file.length > 0);
+        files = stdin.split(separator).filter(file => file.length > 0);
     }
     else{
         files = args.files;
