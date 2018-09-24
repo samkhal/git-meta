@@ -52,6 +52,7 @@ exports.CommandCombiner = class {
         this.command = command;
         this.args = args;
         this.repo = repo;
+        this.repoRoot = repo.workdir();
     }
 
     /**
@@ -77,38 +78,30 @@ exports.CommandCombiner = class {
 
         const results = [];
         const metaRepoPaths = "." in pathMap ? pathMap["."] : [];
-        results.push(await this.runForMetarepo(this.repo, metaRepoPaths, metaExcludePaths));
+        results.push(await this.runForRepo(".", metaRepoPaths, metaExcludePaths));
 
         const self = this;
         await Promise.all(openSubs.map(async function (subName) {
             const subRepoPaths = subName in pathMap ? pathMap[subName] : [];
-            results.push(await self.runForSubrepo(subName, subRepoPaths));
+            results.push(await self.runForRepo(subName, subRepoPaths));
         }));
 
         return this.combineToString(results);
     }
 
-    async runForMetarepo(repo, paths, excludePaths) {
-        let metaPathArgs = [];
-        if (paths.length > 0) {
-            metaPathArgs = ["--"].concat(paths);
-        }
-
-        const metaOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(metaPathArgs), this.repo.workdir());
-        return this.parse(metaOutputStr, excludePaths);
-    }
-
-    async runForSubrepo(subRepoName, paths) {
-        const subRepo = await SubmoduleUtil.getRepo(this.repo, subRepoName);
-        const subRepoPath = subRepo.path();
-
+    async runForRepo(repoPath, paths, excludePaths) {
         let subPathArgs = [];
         if (paths.length > 0) {
             subPathArgs = ["--"].concat(paths);
         }
 
-        const subOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(subPathArgs), subRepoPath);
-        return this.convertToMeta(this.parse(subOutputStr), subRepoName);
+        const runPath = path.resolve(this.repoRoot, repoPath);
+        const subOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(subPathArgs), runPath);
+        const parsed = this.parse(subOutputStr, excludePaths);
+        if (repoPath === ".") {
+            return parsed;
+        }
+        return this.raisePaths(parsed, repoPath);
     }
 }
 
@@ -158,8 +151,8 @@ exports.FileDiffManager = class extends exports.CommandCombiner {
         return data;
     }
 
-    convertToMeta(fileDiffList, subrepoPath) {
-        fileDiffList.map(diff => diff.addPathParent(subrepoPath));
+    raisePaths(fileDiffList, prefixPath) {
+        fileDiffList.map(diff => diff.addPathParent(prefixPath));
         return fileDiffList;
     }
 
@@ -175,7 +168,7 @@ exports.PatchManager = class extends exports.CommandCombiner {
         return str;
     }
 
-    convertToMeta(str, subrepoPath) {
+    raisePaths(str, prefixPath) {
         return str;
     }
 
@@ -189,7 +182,7 @@ exports.StatManager = class extends exports.CommandCombiner {
         return str;
     }
 
-    convertToMeta(str, subrepoPath) {
+    raisePaths(str, prefixPath) {
         return str;
     }
 
@@ -213,9 +206,18 @@ exports.FileListManager = class extends exports.CommandCombiner {
         return await super.run(cwd, paths);
     }
 
-    async runForMetarepo(repo, paths, excludePaths) {
+    async runForRepo(repoPath, paths, excludePaths) {
+        if (repoPath == ".") {
+            return this.runForMetarepo(repoPath, paths, excludePaths);
+        }
+        else {
+            return this.runForSubrepo(repoPath, paths, excludePaths);
+        }
+    }
+
+    async runForMetarepo(repoPath, paths, excludePaths) {
         // If we're not in the repo, no output
-        if(this.runningInRepo !== "."){
+        if (this.runningInRepo !== ".") {
             return [];
         }
 
@@ -224,30 +226,27 @@ exports.FileListManager = class extends exports.CommandCombiner {
             metaPathArgs = ["--"].concat(paths);
         }
 
-        const runPath = path.resolve(this.repo.workdir(), this.relativeRunPath);
+        const runPath = path.resolve(this.repoRoot, this.relativeRunPath);
         const metaOutputStr = await GitUtil.runGitCommand(this.command, this.args.concat(metaPathArgs), runPath);
 
         const files = this.parse(metaOutputStr, excludePaths);
-        if (excludePaths !== undefined) {
-            return files.filter(filename => !excludePaths.has(filename));
-        }
         return files;
     }
 
     async runForSubrepo(subRepoName, paths) {
         let runPath;
-        if(this.runningInRepo === "."){
-            runPath = path.resolve(this.repo.workdir(), subRepoName);
+        if (this.runningInRepo === ".") {
+            runPath = path.resolve(this.repoRoot, subRepoName);
             // Check if the run dir excludes this subrepro
-            const trueRunPathToSubmodule = path.relative(path.resolve(this.repo.workdir(), this.relativeRunPath), runPath);
-            if(trueRunPathToSubmodule.startsWith("..")){
+            const trueRunPathToSubmodule = path.relative(path.resolve(this.repoRoot, this.relativeRunPath), runPath);
+            if (trueRunPathToSubmodule.startsWith("..")) {
                 return []; // nothing to do here
             }
         }
-        else if(this.runningInRepo === subRepoName){
-            runPath = path.resolve(this.repo.workdir(), subRepoName, this.relativeRunPath);
+        else if (this.runningInRepo === subRepoName) {
+            runPath = path.resolve(this.repoRoot, subRepoName, this.relativeRunPath);
         }
-        else{
+        else {
             return []; //Not running in the metarepo or this subrepo, nothing to do here
         }
 
@@ -260,7 +259,7 @@ exports.FileListManager = class extends exports.CommandCombiner {
         const fileList = this.parse(subOutputStr);
 
         // If running from meta repo, need to prepend a path based on the relative path
-        if(this.runningInRepo === "."){
+        if (this.runningInRepo === ".") {
             const prependPath = path.relative(this.relativeRunPath, subRepoName);
             return fileList.map(file => prependPath + path.sep + file);
         }
@@ -269,10 +268,13 @@ exports.FileListManager = class extends exports.CommandCombiner {
 
     parse(str, excludePaths) {
         const nullsplit = str.split('\0').filter(line => line.length > 0);
+        if (excludePaths !== undefined) {
+            return nullsplit.filter(filename => !excludePaths.has(filename));
+        }
         return nullsplit;
     }
 
-    convertToMeta(fileList, subrepoPath) {
+    raisePaths(fileList, subrepoPath) {
         return fileList.map(file => subrepoPath + path.sep + file);
     }
 
