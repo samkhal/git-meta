@@ -90,6 +90,11 @@ describe("DiffIndex", function () {
             state: "a=S|x=U:Os I README.md=x,other=y",
             args: ["HEAD", "--", "s/README.md"],
             expectedLinesContain: ["M\ts/README.md"]
+        },
+        "modified selected path in sub": {
+            state: "a=S|b=S|x=S:I a=Sa:1, b=Sb:1; Oa I README.md=x; Ob I README.md",
+            args: ["HEAD", "--", "a/README.md"],
+            expectedLinesContain: ["M\ta/README.md"]
         }
     };
     Object.keys(cases).forEach(caseName => {
@@ -108,11 +113,7 @@ describe("DiffIndex", function () {
             const resultLines = result.split('\n').filter(val => val !== '');
 
             if (c.expectedLinesContain !== undefined) {
-                assert.equal(resultLines.length, c.expectedLinesContain.length, "Result: ".concat(JSON.stringify(result)));
-                let i;
-                for (i = 0; i < resultLines.length; i++) {
-                    assert.include(resultLines[i], c.expectedLinesContain[i]);
-                }
+                assert.deepEqual(c.expectedLinesContain.sort(), resultLines.map(line => line.split(" ").pop()).sort())
             }
         }));
     });
