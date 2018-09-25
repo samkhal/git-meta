@@ -5,9 +5,10 @@
 # Usage: cmd-log <command> <args...>
 
 DIR=$(dirname $(readlink -f $0))
-CMD=$1
+CMD=$(basename -- "$1")
 mkdir -p $DIR/cmdlogs
-LOGFILE=$DIR/cmdlogs/$1.log
+LOGFILE=$DIR/cmdlogs/$CMD.log
 echo >> $LOGFILE
+echo "Dir: " $PWD >> $LOGFILE
 echo "Calling: " $@ >> $LOGFILE
 $@ | tee -a $LOGFILE

@@ -32,22 +32,22 @@
 
 const argparse = require("argparse");
 
-exports.ForwardArgsAction = function(options){
+exports.ForwardArgsAction = function (options) {
     argparse.Action.call(this, options);
 }
 exports.ForwardArgsAction.prototype = Object.create(argparse.Action.prototype);
 exports.ForwardArgsAction.prototype.constructor = exports.ForwardArgsAction;
-exports.ForwardArgsAction.prototype.call = function(parser, namespace, values, optionString){
-    if(namespace.forwardArgs === undefined){
+exports.ForwardArgsAction.prototype.call = function (parser, namespace, values, optionString) {
+    if (namespace.forwardArgs === undefined) {
         namespace.forwardArgs = [];
     }
     namespace.forwardArgs.push(optionString);
-    if(values !== null && values.length != 0){  //bug here, values might not be a list
+    if (values !== null && values.length != 0) {  //bug here, values might not be a list
         namespace.forwardArgs.push(values);
     }
 }
 
-exports.forwardArgs = function(parser, argsToForward){
+exports.forwardArgs = function (parser, argsToForward) {
     argsToForward.map(arg => {
         parser.addArgument(arg.name, {
             nargs: arg.nargs || 0,

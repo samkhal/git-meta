@@ -31,6 +31,8 @@
 "use strict";
 
 const co = require("co");
+const DiffListUtil = require("../util/diff_list_util")
+const path = require("path");
 
 /**
  * This module contains methods for implementing the `check-attr` command.
@@ -47,16 +49,16 @@ exports.helpText = ``;
  * description of the `check-attr` command
  * @property {String}
  */
-exports.description =``;
+exports.description = ``;
 
 exports.configureParser = function (parser) {
     const forwardArgs = require("../util/forward_args").forwardArgs;
     const argparse = require("argparse");
 
     forwardArgs(parser, [
-        {name: ["-a", "--all"]},
-        {name: "--cached"},
-        {name: "-z"},
+        { name: ["-a", "--all"] },
+        { name: "--cached" },
+        { name: "-z" },
     ]);
     // Not implemented; stdin
 
@@ -65,24 +67,58 @@ exports.configureParser = function (parser) {
     });
 };
 
-function handlePositionals(args){
+function handlePositionals(args) {
     const positionals = args.positionals;
-    if(positionals.length == 0){
+    if (positionals.length == 0) {
         throw "No positional arguments supplied";
     }
     const idx = positionals.indexOf("--");
-    if(idx >= 0){
+    if (idx >= 0) {
         args.attrs = positionals.slice(0, idx);
-        args.pathnames = positionals.slice(idx+1);
+        args.pathnames = positionals.slice(idx + 1);
     }
-    else if(args.all){
+    else if (args.all) {
         args.pathnames = positionals;
     }
-    else{
+    else {
         args.attrs = [positionals[0]];
         args.pathnames = positionals.slice(1);
     }
 }
+
+class CheckAttrManager extends DiffListUtil.CommandCombiner {
+    constructor(command, args, repo, formatZ, cwd) {
+        super(command, args, repo)
+        this.formatZ = formatZ;
+        this.cwd = cwd;
+    }
+
+    parse(str, excludePaths) {
+        // This function splits the text into an array of elements corresponding to paths
+        // Each element is an array of [path, attribute, value]
+        let val = str.split("\0").filter(val => val !== "").reduce((result, value, idx, arr) => {
+            if (idx % 3 == 0)
+                result.push(arr.slice(idx, idx + 3));
+            return result;
+        }, []);
+        return val;
+    }
+
+    raisePaths(pathAttrs, prefixPath) {
+        return pathAttrs.map(attr => {
+            return [prefixPath + path.sep + attr[0], attr[1], attr[2]];
+        })
+    }
+
+    combineToString(listOfPathAttrLists) {
+        const tokenSeparator = this.formatZ ? '\0' : ': ';
+        const attrSeparator = this.formatZ ? '\0' : '\n';
+        const attrList = listOfPathAttrLists.reduce((flattened, toFlatten) => flattened.concat(toFlatten), []);
+        return attrList.map(attr => attr.join(tokenSeparator)).join(attrSeparator) + attrSeparator;
+
+    }
+}
+
 
 /**
  * Execute the `check-attr` command according to the specified `args`.
@@ -90,18 +126,18 @@ function handlePositionals(args){
  * @async
  * @param {Object} args
  */
-exports.executeableSubcommand = co.wrap(function *(args) {
+exports.executeableSubcommand = co.wrap(function* (args) {
     handlePositionals(args);
 
-    // const fs   = require("fs-promise");
+    const fs = require("fs-promise");
 
-    // const LsFiles = require("../util/ls_files");
-    // const GitUtil = require("../util/git_util");
+    const GitUtil = require("../util/git_util");
 
-    // const repo = yield GitUtil.getCurrentRepo();
-    // const cwd = yield fs.realpath(process.cwd());
+    const repo = yield GitUtil.getCurrentRepo();
+    const cwd = yield fs.realpath(process.cwd());
 
-    // const output = yield LsFiles.lsFiles(repo, args, cwd);
-    const output = args;
-    process.stdout.write(JSON.stringify(output));
+    args.forwardArgs = args.forwardArgs || [];
+    const commandArgs = args.forwardArgs.concat('-z', args.attrs);
+    const output = yield (new CheckAttrManager("check-attr", commandArgs, repo, args.z, cwd)).run(cwd, args.pathnames);
+    process.stdout.write(output);
 });

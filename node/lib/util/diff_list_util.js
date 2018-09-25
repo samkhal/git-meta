@@ -62,6 +62,7 @@ exports.CommandCombiner = class {
         if (paths === undefined) {
             paths = [];
         }
+        const runAll = paths.length === 0;
 
         const subNames = new Set(await SubmoduleUtil.getSubmoduleNames(this.repo));
         const openSubs = await SubmoduleUtil.listOpenSubmodules(this.repo);
@@ -76,14 +77,15 @@ exports.CommandCombiner = class {
             pathMap = SubmoduleUtil.mapPathsToRepos(cwd, paths, this.repo.workdir(), openSubmodules)
         }
 
+        const excludePaths = { ".": metaExcludePaths };
         const results = [];
-        const metaRepoPaths = "." in pathMap ? pathMap["."] : [];
-        results.push(await this.runForRepo(".", metaRepoPaths, metaExcludePaths));
+        const openRepos = openSubs.concat(".");
 
         const self = this;
-        await Promise.all(openSubs.map(async function (subName) {
-            const subRepoPaths = subName in pathMap ? pathMap[subName] : [];
-            results.push(await self.runForRepo(subName, subRepoPaths));
+        await Promise.all(openRepos.map(async function (repoName) {
+            const paths = repoName in pathMap ? pathMap[repoName] : [];
+            if (runAll || paths.length > 0)
+                results.push(await self.runForRepo(repoName, paths, excludePaths[repoName]));
         }));
 
         return this.combineToString(results);
@@ -158,7 +160,7 @@ exports.FileDiffManager = class extends exports.CommandCombiner {
 
     combineToString(fileDiffLists) {
         const listSeparator = this.formatZ ? '\0' : '\n';
-        const diffList = fileDiffLists.reduce((flattened, toFlatten) => flattened.concat(toFlatten));
+        const diffList = fileDiffLists.reduce((flattened, toFlatten) => flattened.concat(toFlatten), []);
         return diffList.map(diff => diff.toString(this.formatZ)).join(listSeparator);
     }
 };
